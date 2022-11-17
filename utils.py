@@ -10,7 +10,7 @@ import cv2
 import string
 import time
 from global_land_mask import globe
-from geopy.distance import geodesic
+from geopy.distance import geodesic, distance
 
 api_key = open("googlemaps-apikey.txt", "r").read()
 client = googlemaps.Client(key=api_key)
@@ -47,20 +47,26 @@ COVERABLE_UPPER_BOUND=9.25*60
 def distance_coverable(center):
     n = 25
     r = 0.02
-    def circle_offsets():
-        offsets =[]
-        for i in range(n):
-            deg = i/n * 2 * math.pi
-            offsets.append([math.cos(deg)*r, math.sin(deg)*r])
-        return offsets
+    # def circle_offsets():
+    #     offsets =[]
+    #     for i in range(n):
+    #         deg = i/n * 2 * math.pi
+    #         offsets.append([math.cos(deg)*r, math.sin(deg)*r])
+    #     return offsets
 
-    circle = [[i, center[0] + offset[0], center[1] + offset[1]] for i, offset in enumerate(circle_offsets())]
-    # display_map(center, markers=circle,zoom=11, fill=True)
+    # circle = [[i, center[0] + offset[0], center[1] + offset[1]] for i, offset in enumerate(circle_offsets())]
+    circle = []
+    for i in range(n):
+        rad = i/n * 2 * math.pi
+        deg = 180 * rad/math.pi 
+        point = distance(r).destination(center, bearing=deg)
+        circle.append([i, point.latitude, point.longitude])
+
     unchanged = False
-    # center_str = str(center[0]) + "," + str(center[1])
     max_iterations = 5
     num_iter = 0
     while num_iter < max_iterations and not unchanged:
+        # display(get_map(center, markers=[("red",[(lat,long) for (_, lat, long) in circle])], fills=[[(lat,long) for (_, lat, long) in circle]], zoom=11))
         for point in list(circle):
             if globe.is_ocean(point[1], point[2]):
                 circle.remove(point)
@@ -100,14 +106,14 @@ def distance_coverable(center):
     #     print("(test) circle distance in km", geodesic(point, center))
     return [(lat,long) for (i, lat, long) in circle]
 
-def is_in_city(point, city_name=None):
+def has_address_in(point, city=None):
     res = client.reverse_geocode(point, result_type=["street_address"])
     if res == []:
         return False
-    if city_name == None:
+    if city == None:
         return "formatted_address" in res[0]
     address = res[0]["formatted_address"]
-    return city_name in address
+    return city in address
 
 def is_on_land(point):
     return globe.is_land(point[0], point[1])
