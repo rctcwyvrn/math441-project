@@ -1,24 +1,28 @@
 import googlemaps
 import requests
-from IPython.display import display
 import math
 import numpy as np
 from scipy.optimize import linprog
 from PIL import Image
 import io
-import cv2
-import string
 import time
 from global_land_mask import globe
 from geopy.distance import geodesic, distance
 import random
+import geojson
+import csv
 
 api_key = open("googlemaps-apikey.txt", "r").read()
 client = googlemaps.Client(key=api_key)
 # client = None # temporarily disabled
 
+vancouver_center = (49.249828, -123.125774)
+vancouver_top_left = (49.295863, -123.270310)
+vancovuer_bottom_right = (49.196127, -123.021401)
+
+
 # def get_map(center, markers=[], marker_color="blue", zoom=13, fill=False):
-def get_map(center, markers=[], fills=[], zoom=13):
+def get_map(center, markers=[], fills=[], zoom=11):
     static_map_url = "https://maps.googleapis.com/maps/api/staticmap?"
     lat,long = center
     center = str(lat)+","+str(long)
@@ -175,7 +179,7 @@ def display_solution(center, problem, chosen_indicies, show_coverage=False):
     
     return get_map(center, markers=[("red", chosen_points), ("blue", problem)], fills=fills, zoom=11)
 
-def equidistant_points(center, top_left, bottom_right, height=5, width=5, unit=0.015):    
+def equidistant_points(center=vancouver_center, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, height=20, width=20, unit=1.5):    
     lat_max = top_left[0]
     long_min = top_left[1]
     lat_min = bottom_right[0]
@@ -211,15 +215,22 @@ def straight_line_distance_matrix(sources, destinations):
         D[i:] = row
     return D
 
-def uniform_random_evaluate_solution(hospitals, top_left = (49.295863, -123.270310), bottom_right = (49.196127, -123.021401), n=1000):
+def evaluate_solution_with_sample(hospitals, sample):
+    total = 0
+    for point in sample:
+        distances = straight_line_distance_matrix([point], hospitals)
+        best = min(distances[0])
+        total+= best
+    return total / len(sample)
+
+def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, n=1000):
     lat_max = top_left[0]
     lat_min = bottom_right[0]
     long_max = bottom_right[1]
     long_min = top_left[1]
 
     # random uniform sample
-    total_dist = 0
-    samples = []
+    sample = []
     for _ in range(n):
         invalid = True
         while invalid:
@@ -227,8 +238,44 @@ def uniform_random_evaluate_solution(hospitals, top_left = (49.295863, -123.2703
             long = random.uniform(long_min, long_max)
             p = (lat, long)
             invalid = not is_on_land(p)
-        distances = straight_line_distance_matrix([p], hospitals)
-        best = min(distances[0])
-        total_dist += best
-        samples.append(p)
-    return (total_dist / n, samples)
+        sample.append(p)
+    return (evaluate_solution_with_sample(hospitals, sample), sample)
+
+
+# load geo data
+regions = geojson.loads(open("./data/geos.geojson").read())
+geo_data = {}
+all_points = []
+all_points_weights = []
+
+for region in regions.features:
+    long,lat = region.geometry.coordinates[0][0][0]
+    id = region.properties["id"] 
+    population = region.properties["pop"]
+    geo_data[id] = (lat, long)
+    all_points.append((lat, long))
+    all_points_weights.append(int(population))
+
+senior_population_points = []
+senior_population_points_weights = []
+with open("./data/amount_over_65.csv") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        id = row["GeoUID"]
+        population = row["Population "]
+        senior_population = row["v_CA21_251: 65 years and over"]
+        if senior_population == '' and population == "0":
+            # skip
+            continue 
+        # print(id, geo_data[id], population, senior_population)
+        if int(senior_population) / int(population) > 0.4:
+            senior_population_points.append(geo_data[id])
+            senior_population_points_weights.append(int(population))
+
+def population_sample_evaluate_solution(hospitals, n=1000):
+    sample = random.choices(all_points, weights=all_points_weights, k=n)
+    return (evaluate_solution_with_sample(hospitals, sample), sample)
+
+def senior_population_sample_evaluate_solution(hospitals, n=1000):
+    sample = random.choices(senior_population_points, weights=senior_population_points_weights, k=n)
+    return (evaluate_solution_with_sample(hospitals, sample), sample)
