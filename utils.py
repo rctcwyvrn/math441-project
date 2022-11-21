@@ -11,9 +11,11 @@ import string
 import time
 from global_land_mask import globe
 from geopy.distance import geodesic, distance
+import random
 
 api_key = open("googlemaps-apikey.txt", "r").read()
 client = googlemaps.Client(key=api_key)
+# client = None # temporarily disabled
 
 # def get_map(center, markers=[], marker_color="blue", zoom=13, fill=False):
 def get_map(center, markers=[], fills=[], zoom=13):
@@ -45,6 +47,9 @@ COVERABLE_UPPER_BOUND=9.25*60
 
 # lat,long -> encoded polyline representing the region
 def distance_coverable(center):
+    print("DISABLED")
+    return 
+
     n = 25
     r = 0.02
     # def circle_offsets():
@@ -107,6 +112,8 @@ def distance_coverable(center):
     return [(lat,long) for (i, lat, long) in circle]
 
 def has_address_in(point, city=None):
+    print("DISABLED")
+    return 
     res = client.reverse_geocode(point, result_type=["street_address"])
     if res == []:
         return False
@@ -129,7 +136,7 @@ def linprog_solver(points, matrix):
     solution = linprog(c, A_ub=A, b_ub=b, bounds=bounds, integrality=np.ones(len(points)))
     linprog_solution = []
     for i,chosen in enumerate(solution.x):
-        if chosen == 1:
+        if round(chosen) == 1:
             linprog_solution.append(i)
     return linprog_solution
 
@@ -175,17 +182,53 @@ def equidistant_points(center, top_left, bottom_right, height=5, width=5, unit=0
     long_max = bottom_right[1]
     points = []
     for x in range(width//2):
-        shift = False
+        x_dist = distance(unit * x)
         for y in range(height//2):
-            shift = not shift
-            # if shift:
-            #     center = (center[0] - unit/2, center[1])
-            # else:
-            #     center = (center[0] + unit/2, center[1])
-            points.append((center[0] - y*unit, center[1] - x*unit))
-            points.append((center[0] - y*unit, center[1] + x*unit))
-            points.append((center[0] + y*unit, center[1] - x*unit))
-            points.append((center[0] + y*unit, center[1] + x*unit))
+            y_dist = distance(unit * y)
+            for x_dir in [0, 180]:
+                if x == 0 and x_dir == 180:
+                    continue
+                for y_dir in [90, 270]:
+                    if y == 0 and y_dir == 270:
+                        continue
+                    p = y_dist.destination(x_dist.destination(center, bearing=x_dir), bearing=y_dir)
+                    points.append((p.latitude, p.longitude))
+            # points.append((center[0] - y*unit, center[1] - x*unit))
+            # points.append((center[0] - y*unit, center[1] + x*unit))
+            # points.append((center[0] + y*unit, center[1] - x*unit))
+            # points.append((center[0] + y*unit, center[1] + x*unit))
     # print(points[:10])
     points = list(filter(lambda p: lat_min <= p[0] <= lat_max and long_min <= p[1] <= long_max, points))
     return points
+
+def straight_line_distance_matrix(sources, destinations):
+    n = len(sources)
+    m = len(destinations)
+    D = np.zeros((n,m))
+    for i in range(n):
+        start = sources[i]
+        row = np.array([geodesic(start, other).kilometers for other in destinations])
+        D[i:] = row
+    return D
+
+def uniform_random_evaluate_solution(hospitals, top_left = (49.295863, -123.270310), bottom_right = (49.196127, -123.021401), n=1000):
+    lat_max = top_left[0]
+    lat_min = bottom_right[0]
+    long_max = bottom_right[1]
+    long_min = top_left[1]
+
+    # random uniform sample
+    total_dist = 0
+    samples = []
+    for _ in range(n):
+        invalid = True
+        while invalid:
+            lat = random.uniform(lat_min, lat_max)
+            long = random.uniform(long_min, long_max)
+            p = (lat, long)
+            invalid = not is_on_land(p)
+        distances = straight_line_distance_matrix([p], hospitals)
+        best = min(distances[0])
+        total_dist += best
+        samples.append(p)
+    return (total_dist / n, samples)
