@@ -223,7 +223,7 @@ def evaluate_solution_with_sample(hospitals, sample):
         total+= best
     return total / len(sample)
 
-def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, n=1000):
+def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, n=5000):
     lat_max = top_left[0]
     lat_min = bottom_right[0]
     long_max = bottom_right[1]
@@ -272,10 +272,10 @@ with open("./data/amount_over_65.csv") as f:
             senior_population_points.append(geo_data[id])
             senior_population_points_weights.append(int(population))
 
-def population_sample_evaluate_solution(hospitals, n=1000):
+def population_sample_evaluate_solution(hospitals, n=5000):
     sample = random.choices(all_points, weights=all_points_weights, k=n)
     return (evaluate_solution_with_sample(hospitals, sample), sample)
 
-def senior_population_sample_evaluate_solution(hospitals, n=1000):
+def senior_population_sample_evaluate_solution(hospitals, n=5000):
     sample = random.choices(senior_population_points, weights=senior_population_points_weights, k=n)
     return (evaluate_solution_with_sample(hospitals, sample), sample)
