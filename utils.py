@@ -132,7 +132,7 @@ def is_on_land(point):
 
 # use the set covering problem matrix to just plug directly into linprog
 
-def linprog_solver(points, matrix):
+def set_covering_linprog_solver(points, matrix):
     c = np.ones(len(points))
     b = -np.ones(len(points))
     A = -matrix
@@ -146,7 +146,7 @@ def linprog_solver(points, matrix):
 
 # greedy solver -> alternative to linprog to see if it makes a difference
 
-def greedy_solve(points, matrix):
+def set_covering_greedy_solve(points, matrix):
     taken = []
     internal = np.copy(matrix)
     print("Starting greedy solver")
@@ -223,7 +223,9 @@ def evaluate_solution_with_sample(hospitals, sample):
         total+= best
     return total / len(sample)
 
-def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, n=5000):
+NUM_SAMPLES = 2000
+
+def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, n=NUM_SAMPLES):
     lat_max = top_left[0]
     lat_min = bottom_right[0]
     long_max = bottom_right[1]
@@ -241,7 +243,6 @@ def uniform_random_evaluate_solution(hospitals, top_left = vancouver_top_left, b
         sample.append(p)
     return (evaluate_solution_with_sample(hospitals, sample), sample)
 
-
 # load geo data
 regions = geojson.loads(open("./data/geos.geojson").read())
 geo_data = {}
@@ -258,6 +259,10 @@ for region in regions.features:
 
 senior_population_points = []
 senior_population_points_weights = []
+
+high_senior_population_points = []
+high_senior_population_points_weights = []
+
 with open("./data/amount_over_65.csv") as f:
     reader = csv.DictReader(f)
     for row in reader:
@@ -267,15 +272,25 @@ with open("./data/amount_over_65.csv") as f:
         if senior_population == '' and population == "0":
             # skip
             continue 
-        # print(id, geo_data[id], population, senior_population)
-        if int(senior_population) / int(population) > 0.4:
-            senior_population_points.append(geo_data[id])
-            senior_population_points_weights.append(int(population))
 
-def population_sample_evaluate_solution(hospitals, n=5000):
+        if int(senior_population) / int(population) > 0.4:
+            high_senior_population_points.append(geo_data[id])
+            high_senior_population_points_weights.append(int(senior_population))
+
+        senior_population_points.append(geo_data[id])
+        senior_population_points_weights.append(int(senior_population))
+
+def population_sample_evaluate_solution(hospitals, n=NUM_SAMPLES):
     sample = random.choices(all_points, weights=all_points_weights, k=n)
     return (evaluate_solution_with_sample(hospitals, sample), sample)
 
-def senior_population_sample_evaluate_solution(hospitals, n=5000):
+def senior_population_sample_evaluate_solution(hospitals, n=NUM_SAMPLES):
     sample = random.choices(senior_population_points, weights=senior_population_points_weights, k=n)
+    return (evaluate_solution_with_sample(hospitals, sample), sample)
+
+def balanced_sample_evaluate_solution(hospitals, n=NUM_SAMPLES):
+    # balanced model where the senior population is responsible for 
+    population_sample = random.choices(all_points, weights=all_points_weights, k=int(0.7*n))
+    senior_sample = random.choices(senior_population_points, weights=senior_population_points_weights, k=int(0.3*n))
+    sample = population_sample + senior_sample
     return (evaluate_solution_with_sample(hospitals, sample), sample)
