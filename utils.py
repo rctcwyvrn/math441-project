@@ -166,7 +166,18 @@ def set_covering_greedy_solve(points, matrix):
         # internal = np.delete(internal, (choice), axis=1)
     return sorted(taken)
 
-def display_solution(center, problem, chosen_indicies, show_coverage=False):
+def circle_around(center):
+    n = 25
+    r = 3
+    circle = []
+    for i in range(n):
+        rad = i/n * 2 * math.pi
+        deg = 180 * rad/math.pi 
+        point = distance(r).destination(center, bearing=deg)
+        circle.append((point.latitude, point.longitude))
+    return circle
+
+def display_solution(center, problem, chosen_indicies, show_problem_points=False, show_coverage=False, show_circular_coverage=False):
     chosen_points = []
     for i in chosen_indicies:
         chosen_points.append(problem[i])
@@ -176,8 +187,14 @@ def display_solution(center, problem, chosen_indicies, show_coverage=False):
         for lat,long in chosen_points:
             fills.append(distance_coverable((lat,long)))
             # break
-    
-    return get_map(center, markers=[("red", chosen_points), ("blue", problem)], fills=fills, zoom=11)
+    if show_circular_coverage:
+        for lat,long in chosen_points:
+            fills.append(circle_around((lat,long)))
+            # break
+    if show_problem_points:
+        return get_map(center, markers=[("red", chosen_points), ("blue", problem)], fills=fills, zoom=11)
+    else:
+        return get_map(center, markers=[("red", chosen_points)], fills=fills, zoom=11)
 
 def equidistant_points(center=vancouver_center, top_left = vancouver_top_left, bottom_right = vancovuer_bottom_right, height=20, width=20, unit=1.5):    
     lat_max = top_left[0]
