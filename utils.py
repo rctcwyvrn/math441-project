@@ -51,8 +51,8 @@ COVERABLE_UPPER_BOUND=9.25*60
 
 # lat,long -> encoded polyline representing the region
 def distance_coverable(center):
-    print("DISABLED")
-    return 
+    # print("DISABLED")
+    # return 
 
     n = 25
     r = 0.02
@@ -88,6 +88,8 @@ def distance_coverable(center):
         pairs = zip(circle, matrix[0])
         circle = []
         for ((i, lat, long), time) in pairs:
+            if not is_on_land((lat,long)):
+                continue
             deg = i/n * 2 * math.pi
             y = (lat - center[0])
             x = (long - center[1])
@@ -116,8 +118,8 @@ def distance_coverable(center):
     return [(lat,long) for (i, lat, long) in circle]
 
 def has_address_in(point, city=None):
-    print("DISABLED")
-    return 
+    # print("DISABLED")
+    # return 
     res = client.reverse_geocode(point, result_type=["street_address"])
     if res == []:
         return False
